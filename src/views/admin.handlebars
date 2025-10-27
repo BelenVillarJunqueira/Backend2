@@ -1,0 +1,45 @@
+{{#if msg}}
+<div style="background-color:#d4edda;color:#155724;padding:10px;border-radius:6px;margin-bottom:15px;">
+✅ {{msg}}
+</div>
+{{/if}}
+
+<h1>Panel de Administración</h1>
+<p>Hola {{user.first_name}} ({{user.role}})</p>
+
+<h2>Crear producto</h2>
+<form action="/api/products" method="POST">
+<input type="text" name="title" placeholder="Título" required>
+<input type="text" name="description" placeholder="Descripción" required>
+<input type="text" name="code" placeholder="Código único" required>
+<input type="number" name="price" placeholder="Precio" required>
+<input type="number" name="stock" placeholder="Stock" required>
+<input type="text" name="category" placeholder="Categoría" required>
+
+<input type="text" name="image" placeholder="Imagen principal (URL)">
+<input type="text" name="thumbnails" placeholder="Imágenes extra)">
+
+<button type="submit">Crear producto</button>
+</form>
+
+
+<hr>
+
+<h2>Productos existentes</h2>
+<ul>
+{{#each products}}
+<li>
+    <strong>{{this.title}}</strong> - ${{this.price}}
+
+    <form action="/api/products/{{this._id}}?_method=DELETE" method="POST" style="display:inline;">
+    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+    </form>
+
+    <form action="/api/products/{{this._id}}?_method=PUT" method="POST" style="display:inline;">
+    <input type="text" name="title" placeholder="Nuevo título" required>
+    <button type="submit" class="btn btn-warning btn-sm">Editar</button>
+    </form>
+</li>
+{{/each}}
+</ul>
+
