@@ -15,7 +15,9 @@
 
 <div id="cart">
 <p>Carrito vacío</p>
+<button id="btnPurchase" onclick="purchase()" style="margin-left:8px;">Finalizar compra</button>
 <button onclick="clearCart()">Vaciar carrito</button>
+
 </div>
 
 <hr>
@@ -30,131 +32,342 @@
     <p><strong>${{this.price}}</strong></p>
     <p>{{this.description}}</p>
     <p><small>ID: {{this._id}}</small></p>
-    <p><small>Cantidad:50 {{this.quantity}}</small></p>
+    <p><small><strong>Stock:</strong> {{this.stock}}</small></p>
     
-    <button onclick="addToCart('{{this._id}}', '{{this.title}}', {{this.price}})">
-        🛒 Agregar al carrito
+    
+        <div style="margin: 8px 0;">
+    <label for="qty-{{this._id}}" style="font-size: 0.9rem;">Cantidad:</label>
+    <input id="qty-{{this._id}}" type="number" min="1" value="1" style="width:70px; text-align:center;">
+    </div>
+
+
+    <button onclick="addToCartAPI('{{this._id}}')">
+    🛒 Agregar al carrito
     </button>
+
     </div>
 {{/each}}
 </div>
 
 <div class="pagination">
 {{#if hasPrevPage}}
-    <a href="{{prevLink}}">⬅️ Página anterior</a>
+    <a class="page-btn" href="{{prevLink}}">&laquo; Anterior</a>
 {{/if}}
-<span>Página {{page}} 1 {{totalPages}}</span>
+
+<span class="page-indicator">Página {{page}} / {{totalPages}}</span>
+
 {{#if hasNextPage}}
-    <a href="{{nextLink}}">Página siguiente ➡️</a>
+    <a class="page-btn" href="{{nextLink}}">Siguiente &raquo;</a>
 {{/if}}
 </div>
 
 
 <script>
-    
-let cart = [];
 
-function addToCart(id, title, price, description) {
+let CART_ID = null;      
+let cart = [];              
 
-let existing = cart.find(p => p.id === id);
-if (existing) {
-    existing.quantity++;
-} else {
-    cart.push({ id, title, price, description, quantity: 1 });
+async function getCurrentSession() {
+try {
+    const res = await fetch("/api/sessions/current", {
+    method: "GET",
+    credentials: "include"
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user || null;
+} catch (err) {
+    console.error("Error al obtener sesión actual:", err);
+    return null;
 }
-renderCart();
 }
 
 function clearCart() {
-    cart = [];
-    renderCart();
+cart = [];
+renderCart();
 }
 
 function renderCart() {
 if (cart.length === 0) {
     document.getElementById("cart").innerHTML =
-    "<p>Carrito vacío</p><button onclick='clearCart()'>Vaciar carrito</button>";
+    "<p>Carrito vacío</p>" +
+    "<button id='btnPurchase' onclick='purchase()' style='margin-left:8px;'>Finalizar compra</button>" +
+    "<button onclick='clearCart()'>Vaciar carrito</button>";
 } else {
-    let items = cart.map(
-    (p, index) => `
-        <li>
-        <strong>${p.title}</strong>  
-        (ID: ${p.id})  
-        Cantidad: ${p.quantity || 1}  
-        - $${p.price || 0}  
-        <button onclick="removeFromCart(${index})">❌ Eliminar </button>
-        </li>
-    `
-    ).join("");
+    const items = cart.map((p, i) => `
+    <li>
+        <strong>${p.title}</strong> (x${p.quantity}) - $${p.price}
+        <button onclick="removeFromCart(${i})">❌ Eliminar</button>
+    </li>
+    `).join("");
 
-
-    let total = cart.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 1), 0);
+    const total = cart.reduce((acc, p) => acc + (p.price || 0) * (p.quantity || 1), 0);
 
     document.getElementById("cart").innerHTML =
     "<ul>" + items + "</ul>" +
     `<p><strong>Total: $${total}</strong></p>` +
-    "<button onclick='clearCart()'>Vaciar carrito</button>";
+    "<button onclick='clearCart()'>Vaciar carrito</button>" +
+    "<button id='btnPurchase' onclick='purchase()' style='margin-left:8px;'>Finalizar compra</button>";
 }
 }
-
 
 function removeFromCart(index) {
-cart.splice(index, 1); 
+cart.splice(index, 1);
 renderCart();
 }
+
+async function addToCartAPI(pid) {
+if (!CART_ID) {
+    alert("Necesitás iniciar sesión para usar el carrito.");
+    return;
+}
+try {
+    const qtyInput = document.getElementById(`qty-${pid}`);
+    const quantity = parseInt(qtyInput?.value ?? "1", 10);
+    if (isNaN(quantity) || quantity < 1) {
+    alert("La cantidad debe ser 1 o mayor.");
+    return;
+    }
+
+    const resp = await fetch(`/api/carts/${CART_ID}/products/${pid}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ quantity })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Error al agregar al carrito");
+
+    await refreshCart(); 
+    
+} catch (err) {
+    console.error(err);
+    alert(err.message);
+}
+}
+
+async function refreshCart() {
+if (!CART_ID) return;
+
+try {
+    const resp = await fetch(`/api/carts/${CART_ID}`, { credentials: "include" });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "No se pudo obtener el carrito");
+
+
+    cart = (data.products || []).map(p => ({
+    id: p._id,
+    title: p.title,
+    price: p.price,
+    quantity: p.quantity
+    }));
+
+    renderCart();
+} catch (err) {
+    console.error(err);
+}
+}
+
+
+async function purchase() {
+if (!CART_ID) {
+    alert("Necesitás iniciar sesión para finalizar la compra.");
+    return;
+}
+try {
+    const resp = await fetch(`/api/carts/${CART_ID}/purchase`, {
+    method: "POST",
+    credentials: "include"
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "No se pudo finalizar la compra");
+
+    if (data.purchased) {
+    alert(`Compra OK ✅\nTicket: ${data.ticket.code}\nTotal: $${data.amount}`);
+    } else {
+    alert("No fue posible completar la compra. Hay productos sin stock.");
+    console.log("Sin stock:", data.noStock);
+    }
+    await refreshCart();
+} catch (err) {
+    console.error(err);
+    alert(err.message);
+}
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+const user = await getCurrentSession();
+if (user && user.cart) {
+    CART_ID = user.cart;        
+    await refreshCart();        
+} else {
+    CART_ID = null;
+    renderCart();
+}
+});
+
+
 </script>
+
+<footer class="site-footer">
+    <div class="cols">
+    <div>
+    <h4>Nosotros</h4>
+    <p>Contamos con amplia variedad de árboles, plantas y árbustos. Distintos objetos de decoración, y variedad de herramientas.</p>
+    </div>
+    <div>
+    <h4>Contacto</h4>
+    <ul>
+        <li><a href="mailto:contacto@elviejomanzano.com">contacto@elviejomanzano.com</a></li>
+        <li>Estamos ubicados en El Talar, Tigre.</li>
+        <li>Lun a Vie 9–18h</li>
+    </ul>
+    </div>
+    <div>
+    <h4>Seguinos</h4>
+    <ul>
+                    <div class="redsocial">
+                        <i class="fa-brands fa-facebook"></i>
+                        <i class="fa-brands fa-instagram"></i>
+                        <i class="fa-brands fa-x-twitter"></i>
+                        <i class="fa-brands fa-youtube"></i>
+                    </div>
+    </ul>
+    </div>
+</div>
+
+<div class="copy">
+    <small>© 2025 <b>El viejo Manzano</b> -Todos los Derechos Resevados. - Sitio desarrollado por <b> Belén Villar Junqueira.</b></small>
+</div>
+</footer>
+
 
 
 <style>
 .product-img {
-    width: 100%;
-    height: 220px;          
-    object-fit: cover; 
-    border-radius: 8px;
-    display: block;
-    margin: 0 auto;
-    background-color: #f9f9f9; 
+width: 100%;
+height: 220px;          
+object-fit: cover; 
+border-radius: 8px;
+display: block;
+margin: 0 auto;
+background-color: #f9f9f9; 
 }
 
 .card {
-    border: 1px solid #faa039;
-    border-radius: 10px;
-    padding: 12px;
-    margin: 8px 0;
-    text-align: center;
-        display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    height: 100%; 
+border: 1px solid #faa039;
+border-radius: 10px;
+padding: 12px;
+margin: 8px 0;
+text-align: center;
+display: flex;
+flex-direction: column;
+justify-content: space-between;
+height: 100%; 
 }
 
 
 .grid {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+display: grid;
+gap: 12px;
+grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 }
 
 .card-content {
-    flex-grow: 1;
+flex-grow: 1;
 }
 
 .card button {
-    background-color: #faa039;
-    border: none;
-    color: white;
-    font-weight: bold;
-    padding: 8px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s;
+background-color: #faa039;
+border: none;
+color: white;
+font-weight: bold;
+padding: 8px 12px;
+border-radius: 6px;
+cursor: pointer;
+transition: transform 0.2s, background-color 0.2s;
 }
 
 .card button:hover {
-    background-color: #e38c1a;
-    transform: scale(1.05);
+background-color: #e38c1a;
+transform: scale(1.05);
 }
 
+
+.pagination {
+display: flex;
+justify-content: center;
+align-items: center;
+gap: 12px;
+margin: 24px 0;
+}
+
+.page-btn {
+padding: 8px 14px;
+border: 1px solid #faa039;
+border-radius: 999px;
+text-decoration: none;
+background: #fff;
+color: #333;
+font-weight: 600;
+transition: background-color .2s, color .2s, transform .15s;
+}
+
+.page-btn:hover {
+background: #faa039;
+color: #fff;
+transform: translateY(-1px);
+}
+
+.page-indicator {
+font-weight: 700;
+color: #444;
+}
+
+/* Footer */
+.site-footer {
+margin-top: 40px;
+padding: 24px 16px;
+border-top: 1px solid #eee;
+background: #fffdfa;
+color: #555;
+}
+
+.site-footer .cols {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+gap: 16px;
+max-width: 1100px;
+margin: 0 auto;
+}
+
+.site-footer h4 {
+margin: 0 0 8px;
+font-size: 1rem;
+color: #222;
+}
+
+.site-footer ul {
+padding-left: 0;
+list-style: none;
+margin: 0;
+}
+
+.site-footer a {
+color: #333;
+text-decoration: none;
+}
+
+.site-footer a:hover {
+text-decoration: underline;
+}
+
+.site-footer .copy {
+text-align: center;
+margin-top: 16px;
+color: #777;
+}
 
 </style>
 

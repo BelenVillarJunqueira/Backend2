@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/user.model');
 const Cart = require('../models/cart.model');
+const UserDTO = require('../dtos/user.dto');
 const generateToken = require('../utils/generateToken');
 
 const saltRounds = 10;
@@ -47,13 +48,12 @@ try {
     };
 
 
-    if (req.headers["content-type"] === "application/json") {
+    if (req.is('application/json')) {
     return res.status(201).json({ message: 'Usuario registrado', user: safe });
     }
 
 
     return res.redirect('/login');
-
 } catch (err) {
     console.error('Error register:', err);
     return res.status(500).json({ error: 'Error registrando usuario' });
@@ -74,14 +74,16 @@ try {
     const token = generateToken(user);
 
 
-    res.cookie('authToken', token, {
+res.cookie('authToken', token, {
     httpOnly: true,
-    secure: false,
-        maxAge: 1000 * 60 * 60 * 24
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+      maxAge: 1000 * 60 * 60 * 24,
+    path: '/', 
     });
 
 
-    if (req.headers["content-type"] === "application/json") {
+    if (req.is('application/json')) {
     return res.json({
         message: 'Login OK',
         user: {
@@ -95,25 +97,32 @@ try {
     }
 
 
-    if (user.role === 'admin') {
-    return res.redirect('/admin');
-    } else {
-    return res.redirect('/');
-    }
+    return user.role === 'admin' ? res.redirect('/admin') : res.redirect('/');
 } catch (err) {
     console.error('Error en login:', err.message, err);
     return res.status(500).json({ error: 'Error en login', details: err.message });
 }
 }
 
+
 async function current(req, res) {
-if (!req.user) return res.status(401).json({ error: 'No autenticado' });
-res.json({ user: req.user });
+    if (!req.user) return res.status(401).json({ error: 'No autenticado' });
+    const dto = new UserDTO(req.user); 
+    res.json({ user: dto });
 }
 
 function logout(req, res) {
-res.clearCookie('jwt');
-res.redirect('/login');
+    res.clearCookie('authToken', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/', 
+});
+
+
+const acceptsHtml = (req.headers.accept || '').includes('text/html');
+if (acceptsHtml) return res.redirect('/products');
+return res.json({ message: 'Logout OK' });
 }
 
 module.exports = { register, login, current, logout };

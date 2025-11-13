@@ -8,37 +8,54 @@
 <p>Hola {{user.first_name}} ({{user.role}})</p>
 
 <h2>Crear producto</h2>
-<form action="/api/products" method="POST">
+<form action="/api/products" method="POST" style="display:grid;gap:8px;max-width:600px;">
 <input type="text" name="title" placeholder="Título" required>
 <input type="text" name="description" placeholder="Descripción" required>
 <input type="text" name="code" placeholder="Código único" required>
 <input type="number" name="price" placeholder="Precio" required>
 <input type="number" name="stock" placeholder="Stock" required>
 <input type="text" name="category" placeholder="Categoría" required>
-
 <input type="text" name="image" placeholder="Imagen principal (URL)">
-<input type="text" name="thumbnails" placeholder="Imágenes extra)">
-
-<button type="submit">Crear producto</button>
+<input type="text" name="thumbnails" placeholder="Imágenes extra (URL)">
+<button type="submit" style="background:#28a745;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;">
+    ➕ Crear producto
+</button>
 </form>
-
 
 <hr>
 
-<h2>Productos existentes</h2>
-<ul>
+<h2>📦 Productos existentes</h2>
+
+<ul style="list-style:none;padding:0;max-width:900px;">
 {{#each products}}
-<li>
-    <strong>{{this.title}}</strong> - ${{this.price}}
+<li style="border:1px solid #ccc;border-radius:8px;padding:12px;margin-bottom:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">
+    <div style="flex:1 1 60%;">
+        <strong>{{this.title}}</strong> <br>
+        <small><em>Código:</em> {{this.code}}</small><br>
+        <small><em>Stock:</em> {{this.stock}}</small><br>
+        <small><em>Precio:</em> ${{this.price}}</small>
+    </div>
 
-    <form action="/api/products/{{this._id}}?_method=DELETE" method="POST" style="display:inline;">
-    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-    </form>
+    <div style="flex:1 1 40%;text-align:right;">
+        <form action="/api/products/{{this._id}}?_method=DELETE" method="POST" style="display:inline;">
+        <button type="submit" style="background:#dc3545;color:white;border:none;padding:6px 10px;border-radius:5px;cursor:pointer;">
+            🗑️ Eliminar
+        </button>
+        </form>
 
-    <form action="/api/products/{{this._id}}?_method=PUT" method="POST" style="display:inline;">
-    <input type="text" name="title" placeholder="Nuevo título" required>
-    <button type="submit" class="btn btn-warning btn-sm">Editar</button>
-    </form>
+
+        <form action="/api/products/{{this._id}}?_method=PUT" method="POST" style="display:inline-block;margin-left:8px;">
+        <input type="text" name="title" placeholder="Título" style="width:110px;" required>
+        <input type="text" name="description" placeholder="Descripción" style="width:110px;" required>
+        <input type="number" name="price" placeholder="Precio" style="width:90px;" required>
+        <input type="number" name="stock" placeholder="Stock" style="width:70px;" required>
+        <button type="submit" style="background:#ffc107;color:#000;border:none;padding:6px 10px;border-radius:5px;cursor:pointer;">
+            ✏️ Editar
+        </button>
+        </form>
+    </div>
+    </div>
 </li>
 {{/each}}
 </ul>

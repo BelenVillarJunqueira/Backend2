@@ -1,35 +1,36 @@
-
 const passport = require('passport');
 const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
-const User = require('../models/user.model');
-const { JWT_SECRET } = require('./envs');
+const UserModel = require('../models/user.model');
 
 
-const cookieExtractor = function(req) {
-let token = null;
-if (req && req.cookies) token = req.cookies['authToken'];
-return token;
+
+const cookieExtractor = (req) => {
+  let token = null;
+  if (req && req.cookies) token = req.cookies['authToken']; 
+  return token;
 };
-
-function initPassport() {
-passport.use(
+const initPassport = () => {
+  passport.use(
     'jwt',
     new JwtStrategy(
-    {
-        jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor, ExtractJwt.fromAuthHeaderAsBearerToken()]),
-        secretOrKey: JWT_SECRET
-    },
-    async (jwtPayload, done) => {
+      {
+        jwtFromRequest: ExtractJwt.fromExtractors([
+          cookieExtractor,
+          ExtractJwt.fromAuthHeaderAsBearerToken(), 
+        ]),
+        secretOrKey: process.env.JWT_SECRET,
+      },
+      async (jwtPayload, done) => {
         try {
-        const user = await User.findById(jwtPayload.id).select('-password');
-        if (!user) return done(null, false);
-        return done(null, user);
+          const user = await UserModel.findById(jwtPayload.id);
+          if (!user) return done(null, false);
+          return done(null, user);
         } catch (err) {
-        return done(err, false);
+          return done(err);
         }
-    }
+      }
     )
-);
-}
+  );
+};
 
 module.exports = initPassport;
